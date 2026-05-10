@@ -23,3 +23,6 @@ result-*
 
 # Codegen tool binaries (installed by hack/update-codegen.sh)
 /.tools/
+
+# Editor agent integrations (e.g., emacs agent-shell)
+/.agent-shell/
