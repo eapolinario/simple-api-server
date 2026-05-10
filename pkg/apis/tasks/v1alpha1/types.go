@@ -33,10 +33,12 @@ type TaskSpec struct {
 
 	// Command optionally overrides the image entrypoint.
 	// +optional
+	// +listType=atomic
 	Command []string `json:"command,omitempty"`
 
 	// Args optionally overrides the image command arguments.
 	// +optional
+	// +listType=atomic
 	Args []string `json:"args,omitempty"`
 }
 

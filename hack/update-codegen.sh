@@ -3,12 +3,13 @@
 #
 # Regenerates code under pkg/apis/... using k8s.io/code-generator.
 #
-# Today this only runs the deepcopy generator (which produces
-# zz_generated.deepcopy.go alongside each version package). openapi-gen and
-# client-gen are intentionally not wired in yet; they will be added in
-# follow-up work when they are actually needed (apiserver wiring for
-# openapi, integration / external consumers for client). Watch is deferred,
-# so client-gen's informers/listers would emit code that cannot run anyway.
+# Currently wired:
+#   * deepcopy-gen   -> pkg/apis/tasks/v1alpha1/zz_generated.deepcopy.go
+#   * openapi-gen    -> pkg/generated/openapi/zz_generated.openapi.go
+#
+# client-gen is intentionally not wired in yet: its informers and listers
+# depend on watch, which is deferred for this experiment, so generating
+# them today would emit code that 405s against our own server.
 
 set -o errexit
 set -o nounset
@@ -25,8 +26,9 @@ if [ -z "${CODEGEN_PKG}" ] || [ ! -f "${CODEGEN_PKG}/kube_codegen.sh" ]; then
     exit 1
 fi
 
-# kube_codegen.sh's gen_helpers calls `go install` and then runs binaries from
-# ${GOBIN}. Pin GOBIN to a predictable location so successive runs reuse it.
+# kube_codegen.sh's gen_* helpers call `go install` and then run binaries
+# from ${GOBIN}. Pin GOBIN to a predictable location so successive runs
+# reuse it.
 export GOBIN="${SCRIPT_ROOT}/.tools/bin"
 export PATH="${GOBIN}:${PATH}"
 mkdir -p "${GOBIN}"
@@ -34,7 +36,19 @@ mkdir -p "${GOBIN}"
 # shellcheck source=/dev/null
 source "${CODEGEN_PKG}/kube_codegen.sh"
 
+THIS_PKG="github.com/eapolinario/simple-api-server"
+
 echo "Running deepcopy-gen against pkg/apis ..."
 kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     "${SCRIPT_ROOT}/pkg/apis"
+
+echo "Running openapi-gen against pkg/apis ..."
+kube::codegen::gen_openapi \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    --output-dir "${SCRIPT_ROOT}/pkg/generated/openapi" \
+    --output-pkg "${THIS_PKG}/pkg/generated/openapi" \
+    --report-filename "${SCRIPT_ROOT}/hack/api-violations.report" \
+    --update-report \
+    "${SCRIPT_ROOT}/pkg/apis"
+

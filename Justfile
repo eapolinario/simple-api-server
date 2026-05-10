@@ -49,7 +49,7 @@ verify-codegen:
     #!/usr/bin/env bash
     set -euo pipefail
     hack/update-codegen.sh
-    if ! git diff --exit-code -- pkg/apis; then
+    if ! git diff --exit-code -- pkg/apis pkg/generated hack/api-violations.report; then
         echo "::error::Generated code is out of date. Run 'just codegen' and commit the result."
         exit 1
     fi
