@@ -62,7 +62,7 @@ These decisions were made deliberately. If a request would violate one,
 6. **Tests are first-class.** Every behavioral change ships with a test in the
    same PR. See "Test discipline" below.
 
-## Project layout _(planned, follows kubernetes/sample-apiserver)_
+## Project layout _(follows kubernetes/sample-apiserver)_
 
 ```
 cmd/simple-apiserver/main.go         # binary entrypoint; wires options + server
@@ -75,37 +75,63 @@ pkg/apis/tasks/                      # internal API types
 pkg/registry/tasks/task/
   strategy.go                        # rest.RESTCreateUpdateStrategy + status strategy
   storage.go                         # REST + StatusREST wired to the in-memory store
-pkg/storage/inmemory/                # the storage.Interface-shaped in-memory backend
+pkg/storage/inmemory/                # in-memory backend (map + sync.RWMutex + monotonic RV)
 pkg/apiserver/apiserver.go           # GenericAPIServer config + APIGroupInfo install
 hack/update-codegen.sh               # invokes k8s.io/code-generator/kube_codegen.sh
-hack/boilerplate.go.txt              # license header for generated files
+hack/boilerplate.go.txt              # header prepended to generated files
 test/integration/                    # in-process apiserver tests
 test/e2e/                            # //go:build e2e, runs against kind
-Makefile                             # build / test / codegen / e2e targets
+manifests/                           # APIService YAML and friends
+flake.nix / flake.lock / .envrc      # Nix dev shell
+Justfile                             # task runner
 go.mod
 ```
+
+The package directories are scaffolded with `doc.go` placeholders today;
+real types and code arrive in subsequent todos.
 
 When adding code, place it according to this layout. If a file doesn't have
 an obvious home, ask.
 
-## Build, test, run _(planned — fill in as targets land)_
+## Dev environment
 
-The intended Makefile surface (do not invent alternatives):
+The repo is a **Nix flake** with `direnv` auto-activation. Outside Nix the
+project may still build with whatever Go is on `$PATH`, but the canonical
+toolchain is the dev shell:
 
-```bash
-make build              # go build ./cmd/simple-apiserver
-make test               # unit + in-process integration (default loop)
-make test-unit          # go test -short ./...
-make test-integration   # go test -run Integration ./test/integration/...
-make test-e2e           # go test -tags=e2e ./test/e2e/...   (requires kind)
-make codegen            # regenerates deepcopy / openapi / client
-make verify-codegen     # fails CI if generated files are stale
-make lint               # go vet + golangci-lint (when added)
+```sh
+nix develop          # or: direnv allow (one-time, then auto-loads on cd)
+go version           # currently 1.26.x via nixpkgs-unstable
+```
+
+The dev shell provides: `go`, `gopls`, `golangci-lint`, `gotools`, `just`,
+`kubectl`, `kind`. Do not add tool installations to a shell script — add
+them to `flake.nix`.
+
+`flake.lock` is committed; bump it deliberately with `nix flake update`.
+
+## Build, test, run _(some targets are stubs until later todos)_
+
+`Justfile` is the task runner (not Make). Run `just` with no args to list
+recipes. Current surface:
+
+```sh
+just build              # go build ./cmd/simple-apiserver
+just test               # default loop: go test ./...
+just test-unit          # go test -short ./...
+just test-integration   # go test ./test/integration/...
+just test-e2e           # go test -tags=e2e ./test/e2e/...   (requires kind)
+just run                # go run ./cmd/simple-apiserver
+just fmt                # gofmt -w .
+just lint               # golangci-lint run
+just codegen            # TODO: wired up in codegen-setup todo
+just verify-codegen     # TODO: wired up in codegen-setup todo
+just clean              # go clean ./...
 ```
 
 ### Running a single test
 
-```bash
+```sh
 go test ./pkg/registry/tasks/task/ -run TestStrategy_Validate_RejectsEmptyImage -v
 go test -tags=e2e ./test/e2e/ -run TestE2E_CreateTaskViaAPIService -v
 ```

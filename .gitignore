@@ -1,0 +1,22 @@
+# Binaries (root-anchored so they don't shadow cmd/simple-apiserver/)
+/simple-api-server
+/simple-apiserver
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace
+go.work.sum
+
+# Nix / direnv
+.direnv
+result
+result-*

@@ -22,6 +22,8 @@ locked in:
   by `//go:build e2e`
 - Auth: delegating in prod, AlwaysAllow + anonymous in tests
 - Module path: `github.com/eapolinario/simple-api-server`
+- Dev environment: Nix flake (`nixpkgs-unstable`) + direnv + Justfile;
+  Go via `pkgs.go` (currently 1.26.x)
 
 ## Approach
 
@@ -46,7 +48,7 @@ observedGeneration, and finally the deferred-watch test.
 | `watch-405-test` | Assert watch returns 405 | `integration-harness` |
 | `apiservice-manifest` | APIService YAML | `apiserver-wiring` |
 | `e2e-skeleton` | Kind-based E2E | `apiservice-manifest`, `integration-harness` |
-| `makefile` | Makefile surface | `init-module` |
+| `makefile` | Justfile surface | `init-module` |
 | `ci` | GitHub Actions CI | `makefile` |
 
 Descriptions for each todo are in the seed block below — keep them in sync
@@ -76,7 +78,7 @@ this repo, paste the block below into the `sql` tool to populate it. Uses
 INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
   ('init-module',         'Initialize Go module + skeleton',         'go mod init github.com/eapolinario/simple-api-server, create empty package directories matching the planned layout, add hack/boilerplate.go.txt', 'pending'),
   ('types-v1alpha1',      'Define Task v1alpha1 types',              'pkg/apis/tasks/v1alpha1/types.go: Task, TaskSpec (image, command), TaskStatus (phase, conditions, observedGeneration), TaskList; register.go with GroupVersion + AddToScheme', 'pending'),
-  ('codegen-setup',       'Wire k8s code-generator',                 'hack/update-codegen.sh invoking kube_codegen.sh; Makefile codegen + verify-codegen targets; generate deepcopy + openapi + client', 'pending'),
+  ('codegen-setup',       'Wire k8s code-generator',                 'hack/update-codegen.sh invoking kube_codegen.sh; flesh out Justfile codegen + verify-codegen recipes; generate deepcopy + openapi + client', 'pending'),
   ('inmemory-store',      'Implement in-memory store',               'pkg/storage/inmemory: map keyed by namespaced name, sync.RWMutex, monotonic uint64 RV, generic over runtime.Object; unit tests for CRUD + RV monotonicity', 'pending'),
   ('strategy',            'Implement Task strategy + status strategy','pkg/registry/tasks/task/strategy.go: validation, mutability rules, observedGeneration discipline; table-driven unit tests', 'pending'),
   ('registry-storage',    'REST + StatusREST wiring',                'pkg/registry/tasks/task/storage.go: REST and StatusREST backed by in-memory store; typed errors via k8s.io/apimachinery/pkg/api/errors', 'pending'),
@@ -86,7 +88,7 @@ INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
   ('watch-405-test',      'Assert watch returns 405',                'test asserting ?watch=true returns MethodNotAllowed; lives in test/integration; documents the deferral', 'pending'),
   ('apiservice-manifest', 'APIService YAML',                         'manifests/apiservice.yaml registering v1alpha1.tasks.example.com', 'pending'),
   ('e2e-skeleton',        'Kind-based E2E',                          'test/e2e with //go:build e2e: apply APIService against kind, create Task through aggregator, assert reachable', 'pending'),
-  ('makefile',            'Makefile surface',                        'build, test, test-unit, test-integration, test-e2e, codegen, verify-codegen, lint targets', 'pending'),
+  ('makefile',            'Justfile surface',                        'build, test, test-unit, test-integration, test-e2e, codegen, verify-codegen, lint, fmt, clean recipes (the `makefile` id is retained for stability — the file itself is a Justfile)', 'pending'),
   ('ci',                  'GitHub Actions CI',                       'workflow running unit + integration + verify-codegen on PRs', 'pending');
 
 INSERT OR IGNORE INTO todo_deps (todo_id, depends_on) VALUES
