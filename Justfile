@@ -12,6 +12,10 @@ build:
 test:
     go test ./...
 
+# Run unit tests with the race detector (requires CGO)
+test-race:
+    CGO_ENABLED=1 go test -race ./...
+
 # Run unit tests only
 test-unit:
     go test -short ./...
