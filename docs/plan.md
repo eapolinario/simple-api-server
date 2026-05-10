@@ -79,6 +79,14 @@ with this table when editing.
 - **PR / merge convention:** A todo is only marked `done` once its PR has
   actually merged into `main`. While a PR is open, the todo stays
   `in_progress`. Local commits don't count.
+- `cmd-main` ships a `--authorization-mode` flag with values `""` (default,
+  delegating) and `AlwaysAllow` (local-dev only, paired with a loopback
+  bind). The path-based `--authorization-always-allow-paths` upstream flag
+  is not sufficient because its authorizer ignores resource requests
+  (`k8s.io/apiserver/pkg/authorization/path` returns `NoOpinion` whenever
+  `IsResourceRequest()` is true). The `just dev` / `just dev-kubeconfig` /
+  `just dev-clean` recipes are the supported way to drive the binary
+  locally with kubectl.
 
 ## SQL seed block (rehydrate in-session todos)
 
@@ -96,8 +104,8 @@ INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
   ('inmemory-store',      'Implement in-memory store',               'pkg/storage/inmemory: map keyed by namespaced name, sync.RWMutex, monotonic uint64 RV, generic over runtime.Object; unit tests for CRUD + RV monotonicity', 'pending'),
   ('strategy',            'Implement Task strategy + status strategy','pkg/registry/tasks/task/strategy.go: validation, mutability rules, observedGeneration discipline; table-driven unit tests', 'pending'),
   ('registry-storage',    'REST + StatusREST wiring',                'pkg/registry/tasks/task/storage.go: REST and StatusREST backed by in-memory store; typed errors via k8s.io/apimachinery/pkg/api/errors', 'pending'),
-  ('apiserver-wiring',    'GenericAPIServer config',                 'pkg/apiserver/apiserver.go: APIGroupInfo install, scheme registration, options', 'pending'),
-  ('cmd-main',            'Binary entrypoint',                       'cmd/simple-apiserver/main.go: option parsing, delegating auth in prod, server start', 'pending'),
+  ('apiserver-wiring',    'GenericAPIServer config',                 'pkg/apiserver/apiserver.go: APIGroupInfo install, scheme registration, options', 'done'),
+  ('cmd-main',            'Binary entrypoint',                       'cmd/simple-apiserver/main.go: option parsing, delegating auth in prod, server start', 'done'),
   ('integration-harness', 'In-process integration tests',            'test/integration: boot server in-process, REST client round-trips for create/get/list/update/delete and status subresource', 'pending'),
   ('watch-405-test',      'Assert watch returns 405',                'test asserting ?watch=true returns MethodNotAllowed; lives in test/integration; documents the deferral', 'pending'),
   ('apiservice-manifest', 'APIService YAML',                         'manifests/apiservice.yaml registering v1alpha1.tasks.example.com', 'pending'),
