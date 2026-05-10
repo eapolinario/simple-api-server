@@ -13,12 +13,18 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	apiservercompatibility "k8s.io/apiserver/pkg/util/compatibility"
 
 	"github.com/eapolinario/simple-api-server/pkg/apiserver"
 )
+
+// AuthorizationModeAlwaysAllow short-circuits authz with an "allow
+// everything" authorizer. Loopback-bind + local-dev only — see
+// Options.AuthorizationMode for the full rationale.
+const AuthorizationModeAlwaysAllow = "AlwaysAllow"
 
 // Options aggregates the option groups simple-apiserver consumes from
 // k8s.io/apiserver/pkg/server/options. We do NOT use
@@ -40,6 +46,16 @@ type Options struct {
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
 	Audit          *genericoptions.AuditOptions
 	Features       *genericoptions.FeatureOptions
+
+	// AuthorizationMode toggles the authz path. Empty (default) keeps
+	// the delegating authorizer wired by Authorization.ApplyTo — the
+	// production posture. The only other accepted value is
+	// "AlwaysAllow", which replaces the authorizer with one that
+	// approves every request. AlwaysAllow exists for local development
+	// and the in-process test harness; it MUST NOT be used on a
+	// non-loopback interface. The `just dev` recipe pairs it with
+	// --bind-address=127.0.0.1 to enforce that at the network layer.
+	AuthorizationMode string
 
 	// stdout / stderr are wired through so tests can capture output.
 	StdOut io.Writer
@@ -89,6 +105,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.Authorization.AddFlags(fs)
 	o.Audit.AddFlags(fs)
 	o.Features.AddFlags(fs)
+	fs.StringVar(&o.AuthorizationMode, "authorization-mode", o.AuthorizationMode,
+		`Authorization mode. Empty (default) delegates to the host kube-apiserver via SubjectAccessReview. `+
+			`"AlwaysAllow" bypasses authz entirely and is intended for local development on a loopback bind only.`)
 }
 
 // Validate aggregates per-option-group validation errors.
@@ -99,6 +118,12 @@ func (o *Options) Validate() error {
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Audit.Validate()...)
 	errs = append(errs, o.Features.Validate()...)
+	switch o.AuthorizationMode {
+	case "", AuthorizationModeAlwaysAllow:
+	default:
+		errs = append(errs, fmt.Errorf("--authorization-mode=%q is not supported (allowed: \"\", %q)",
+			o.AuthorizationMode, AuthorizationModeAlwaysAllow))
+	}
 	return utilerrors.NewAggregate(errs)
 }
 
@@ -137,8 +162,21 @@ func (o *Options) Config() (*apiserver.Config, error) {
 	if err := o.Authentication.ApplyTo(&serverConfig.Config.Authentication, serverConfig.Config.SecureServing, serverConfig.OpenAPIConfig); err != nil {
 		return nil, fmt.Errorf("apply authentication: %w", err)
 	}
-	if err := o.Authorization.ApplyTo(&serverConfig.Config.Authorization); err != nil {
-		return nil, fmt.Errorf("apply authorization: %w", err)
+	switch o.AuthorizationMode {
+	case AuthorizationModeAlwaysAllow:
+		// Skip Authorization.ApplyTo entirely — it would try to dial a
+		// SubjectAccessReview endpoint we don't have. The path-based
+		// AlwaysAllowPaths option also can't help here because it
+		// short-circuits non-resource requests only (see
+		// k8s.io/apiserver/pkg/authorization/path), so resource calls
+		// like /apis/tasks.example.com/v1alpha1/.../tasks would still
+		// be denied. Wiring a real always-allow authorizer is the only
+		// way to make CRUD work for an anonymous local kubectl.
+		serverConfig.Config.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	default:
+		if err := o.Authorization.ApplyTo(&serverConfig.Config.Authorization); err != nil {
+			return nil, fmt.Errorf("apply authorization: %w", err)
+		}
 	}
 	if err := o.Audit.ApplyTo(&serverConfig.Config); err != nil {
 		return nil, fmt.Errorf("apply audit: %w", err)

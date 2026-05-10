@@ -60,11 +60,47 @@ func TestAddFlags_RegistersExpectedFlags(t *testing.T) {
 		"authorization-kubeconfig",     // DelegatingAuthorization
 		"audit-log-path",               // Audit
 		"enable-priority-and-fairness", // Features
+		"authorization-mode",           // Options (our own)
 	}
 	for _, name := range want {
 		if fs.Lookup(name) == nil {
 			t.Errorf("flag %q not registered", name)
 		}
+	}
+}
+
+// TestValidate_AuthorizationMode ensures the --authorization-mode flag
+// only accepts values whose plumbing we've actually wired. A typo or a
+// stale shell snippet referencing "AlwaysDeny" or "RBAC" should fail
+// startup with a clear error rather than silently falling through to
+// the delegating default and leaving the operator wondering why their
+// dev kubectl gets 403s.
+func TestValidate_AuthorizationMode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		mode    string
+		wantErr bool
+	}{
+		{"", false},
+		{AuthorizationModeAlwaysAllow, false},
+		{"AlwaysDeny", true},
+		{"RBAC", true},
+		{"alwaysallow", true}, // case-sensitive on purpose
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.mode, func(t *testing.T) {
+			o := NewOptions(io.Discard, io.Discard)
+			o.AuthorizationMode = tc.mode
+			err := o.Validate()
+			if tc.wantErr && err == nil {
+				t.Errorf("Validate() with mode=%q returned nil; want error", tc.mode)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("Validate() with mode=%q returned %v; want nil", tc.mode, err)
+			}
+		})
 	}
 }
 

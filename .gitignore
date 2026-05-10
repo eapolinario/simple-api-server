@@ -26,3 +26,6 @@ result-*
 
 # Editor agent integrations (e.g., emacs agent-shell)
 /.agent-shell/
+
+# Local dev runtime artifacts produced by `just dev` / `just dev-kubeconfig`
+/.local-run/
