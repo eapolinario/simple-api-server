@@ -40,15 +40,19 @@ fmt:
 lint:
     golangci-lint run
 
-# Regenerate deepcopy / openapi / client code (TODO: wired up in codegen-setup)
+# Regenerate deepcopy / openapi / client code
 codegen:
-    @echo "TODO: codegen-setup todo will wire up hack/update-codegen.sh (kube_codegen.sh)"
-    @exit 1
+    hack/update-codegen.sh
 
-# Verify generated code is up to date (TODO: wired up in codegen-setup)
+# Verify generated code is up to date (CI-friendly: regenerates and fails on diff)
 verify-codegen:
-    @echo "TODO: codegen-setup todo will implement verify-codegen"
-    @exit 1
+    #!/usr/bin/env bash
+    set -euo pipefail
+    hack/update-codegen.sh
+    if ! git diff --exit-code -- pkg/apis; then
+        echo "::error::Generated code is out of date. Run 'just codegen' and commit the result."
+        exit 1
+    fi
 
 # Remove build artifacts
 clean:

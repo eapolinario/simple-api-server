@@ -64,8 +64,20 @@ with this table when editing.
   is a milestone of its own — not a "real quick" addition.
 - Codegen entrypoint: `k8s.io/code-generator/kube_codegen.sh` (modern), not
   the older `generate-internal-groups.sh`.
+- `codegen-setup` deliberately ships **deepcopy only** in its first PR.
+  `openapi-gen` and `client-gen` are deferred:
+    - `openapi-gen` lands when `apiserver-wiring` actually consumes the spec
+      (the OpenAPI definitions plug into `genericapiserver.RecommendedConfig`).
+    - `client-gen` lands no earlier than watch — its informers/listers depend
+      on watch and would otherwise emit code that 405s against our server.
+  The `+k8s:deepcopy-gen=package` marker lives in `pkg/apis/tasks/v1alpha1/doc.go`
+  in a **standalone** comment block (not the package doc comment) — gengo only
+  picks it up that way.
 - `genericregistry.Store` is **not** used — its etcd assumptions leak. We
   implement REST handlers against our own store directly.
+- **PR / merge convention:** A todo is only marked `done` once its PR has
+  actually merged into `main`. While a PR is open, the todo stays
+  `in_progress`. Local commits don't count.
 
 ## SQL seed block (rehydrate in-session todos)
 

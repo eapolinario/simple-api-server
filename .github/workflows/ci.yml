@@ -67,3 +67,6 @@ jobs:
             echo "::error::go.mod or go.sum is not tidy. Run 'go mod tidy' locally and commit."
             exit 1
           fi
+
+      - name: Verify generated code is up to date
+        run: nix develop --command just verify-codegen
