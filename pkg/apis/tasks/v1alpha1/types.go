@@ -4,9 +4,6 @@ Copyright 2026 Eduardo Apolinario.
 
 // Package v1alpha1 contains the external (versioned) Task API types served
 // at tasks.example.com/v1alpha1.
-//
-// +kubebuilder:object:generate=true
-// +groupName=tasks.example.com
 package v1alpha1
 
 import (

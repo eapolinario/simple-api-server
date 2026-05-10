@@ -18,11 +18,15 @@ block that rehydrates the in-session `todos` / `todo_deps` tables.
    `docs/plan.md` into the `sql` tool to repopulate. The seed uses
    `INSERT OR IGNORE`, so re-running is safe.
 3. Use the "ready work" query from the plan to find the next unblocked todo.
-4. Set status to `in_progress` before starting; `done` when committed.
+4. Set status to `in_progress` before starting; only flip to `done` once
+   the corresponding PR has **merged into `main`**. A local commit, or a
+   PR that is open / under review, is still `in_progress`.
 5. When a status change is meaningful (todo completed, scope changed, new
    todo added), update `docs/plan.md` and commit it alongside the code
    change. The markdown file is the source of truth across sessions; SQL is
    the live working view within a session.
+6. Each todo gets its own feature branch and PR (`feature/<todo-id>`).
+   Do not stack multiple todos in one PR.
 
 ## What this project is
 
@@ -124,8 +128,8 @@ just test-e2e           # go test -tags=e2e ./test/e2e/...   (requires kind)
 just run                # go run ./cmd/simple-apiserver
 just fmt                # gofmt -w .
 just lint               # golangci-lint run
-just codegen            # TODO: wired up in codegen-setup todo
-just verify-codegen     # TODO: wired up in codegen-setup todo
+just codegen            # hack/update-codegen.sh (deepcopy only, currently)
+just verify-codegen     # codegen + git diff --exit-code -- pkg/apis
 just clean              # go clean ./...
 ```
 
@@ -142,13 +146,28 @@ Always pass `-run` and `-v` for targeted runs; never grep test output to
 ## Codegen workflow
 
 1. Edit types in `pkg/apis/tasks/v1alpha1/types.go`.
-2. Run `make codegen` (wraps `k8s.io/code-generator/kube_codegen.sh`).
-3. Commit the regenerated `zz_generated_*.go` files in the same commit as the
+2. Run `just codegen` (wraps `k8s.io/code-generator/kube_codegen.sh`).
+3. Commit the regenerated `zz_generated.*.go` files in the same commit as the
    type change. **Never hand-edit generated files.**
-4. CI runs `make verify-codegen`; a stale tree fails the build.
+4. CI runs `just verify-codegen`; a stale tree fails the build.
 
-Generators in scope: `deepcopy`, `openapi`, `client`. Out of scope until
-needed: `conversion` (only one version), `defaulter` (no defaults yet).
+Currently wired: `deepcopy-gen` only. Output: `pkg/apis/tasks/v1alpha1/zz_generated.deepcopy.go`.
+
+Deferred — add to `hack/update-codegen.sh` when the consumer lands:
+- `openapi-gen` — needed by `apiserver-wiring` (RecommendedConfig.OpenAPIConfig).
+- `client-gen` — defer until at least an `informers/listers` consumer exists.
+  Watch is deferred, so client-gen's informers/listers would emit code that
+  cannot run against our server.
+
+Out of scope: `conversion` (only one version), `defaulter` (no defaults yet).
+
+The package-level marker `+k8s:deepcopy-gen=package` lives in
+`pkg/apis/tasks/v1alpha1/doc.go` in a **standalone comment block** (not
+attached to the package doc comment) — gengo only picks it up that way.
+
+`k8s.io/code-generator` is tracked via the `tool` directive in `go.mod`
+(Go 1.24+), not via `tools.go`. Tool binaries are installed to
+`./.tools/bin/` (gitignored) by `hack/update-codegen.sh`.
 
 ## Key conventions
 

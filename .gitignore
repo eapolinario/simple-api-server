@@ -20,3 +20,6 @@ go.work.sum
 .direnv
 result
 result-*
+
+# Codegen tool binaries (installed by hack/update-codegen.sh)
+/.tools/
