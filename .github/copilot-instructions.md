@@ -5,6 +5,25 @@
 > decided through discussion — treat them as constraints, not suggestions.
 > Anything not yet implemented is labeled _(planned)_.
 
+## Plan and todo tracking
+
+The durable plan lives at [`docs/plan.md`](../docs/plan.md). It contains the
+problem statement, approach, todo list with dependencies, and a SQL seed
+block that rehydrates the in-session `todos` / `todo_deps` tables.
+
+**At the start of every session in this repo:**
+
+1. Read `docs/plan.md` to load context.
+2. If `SELECT COUNT(*) FROM todos` returns 0, paste the seed block from
+   `docs/plan.md` into the `sql` tool to repopulate. The seed uses
+   `INSERT OR IGNORE`, so re-running is safe.
+3. Use the "ready work" query from the plan to find the next unblocked todo.
+4. Set status to `in_progress` before starting; `done` when committed.
+5. When a status change is meaningful (todo completed, scope changed, new
+   todo added), update `docs/plan.md` and commit it alongside the code
+   change. The markdown file is the source of truth across sessions; SQL is
+   the live working view within a session.
+
 ## What this project is
 
 An **aggregated Kubernetes API server** built using only official extension
