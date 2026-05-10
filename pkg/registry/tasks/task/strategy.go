@@ -12,29 +12,31 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/storage/names"
 
 	v1alpha1 "github.com/eapolinario/simple-api-server/pkg/apis/tasks/v1alpha1"
 )
 
 // Strategy implements the create / non-status-update behavior for Task.
 //
-// The method set conforms to k8s.io/apiserver/pkg/registry/rest's
-// RESTCreateStrategy and RESTUpdateStrategy without importing that
-// package — that wiring lives in the registry-storage layer
-// (pkg/registry/tasks/task/storage.go, registry-storage todo). Keeping
-// the strategy free of the apiserver dep means strategy tests are pure
-// unit tests with no HTTP, no scheme registration beyond v1alpha1, and
-// no k8s.io/apiserver imports.
+// The method set satisfies k8s.io/apiserver/pkg/registry/rest.RESTCreateStrategy
+// and rest.RESTUpdateStrategy. NameGenerator is embedded via
+// names.SimpleNameGenerator so the apiserver can populate metadata.name
+// when only generateName is set.
 //
 // Concurrency: Strategy values are stateless and safe for concurrent use.
 type Strategy struct {
 	runtime.ObjectTyper
+	names.NameGenerator
 }
 
 // NewStrategy returns a Strategy that uses typer (typically a runtime
 // Scheme) for ObjectTyper duties.
 func NewStrategy(typer runtime.ObjectTyper) Strategy {
-	return Strategy{ObjectTyper: typer}
+	return Strategy{
+		ObjectTyper:   typer,
+		NameGenerator: names.SimpleNameGenerator,
+	}
 }
 
 // NamespaceScoped reports that Task is a namespaced resource.

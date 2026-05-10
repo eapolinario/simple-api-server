@@ -38,11 +38,12 @@ observedGeneration, and finally the deferred-watch test.
 |---|---|---|
 | `init-module` | Initialize Go module + skeleton | — |
 | `types-v1alpha1` | Define Task v1alpha1 types | `init-module` |
-| `codegen-setup` | Wire k8s code-generator | `types-v1alpha1` |
+| `codegen-setup` | Wire k8s code-generator (deepcopy) | `types-v1alpha1` |
+| `codegen-openapi` | Wire openapi-gen alongside deepcopy | `codegen-setup` |
 | `inmemory-store` | Implement in-memory store | `init-module` |
 | `strategy` | Implement Task strategy + status strategy | `types-v1alpha1` |
 | `registry-storage` | REST + StatusREST wiring | `inmemory-store`, `strategy` |
-| `apiserver-wiring` | GenericAPIServer config | `registry-storage` |
+| `apiserver-wiring` | GenericAPIServer config | `registry-storage`, `codegen-openapi` |
 | `cmd-main` | Binary entrypoint | `apiserver-wiring` |
 | `integration-harness` | In-process integration tests | `cmd-main`, `codegen-setup` |
 | `watch-405-test` | Assert watch returns 405 | `integration-harness` |
@@ -64,15 +65,15 @@ with this table when editing.
   is a milestone of its own — not a "real quick" addition.
 - Codegen entrypoint: `k8s.io/code-generator/kube_codegen.sh` (modern), not
   the older `generate-internal-groups.sh`.
-- `codegen-setup` deliberately ships **deepcopy only** in its first PR.
-  `openapi-gen` and `client-gen` are deferred:
-    - `openapi-gen` lands when `apiserver-wiring` actually consumes the spec
-      (the OpenAPI definitions plug into `genericapiserver.RecommendedConfig`).
-    - `client-gen` lands no earlier than watch — its informers/listers depend
-      on watch and would otherwise emit code that 405s against our server.
-  The `+k8s:deepcopy-gen=package` marker lives in `pkg/apis/tasks/v1alpha1/doc.go`
-  in a **standalone** comment block (not the package doc comment) — gengo only
-  picks it up that way.
+- `codegen-setup` ships **deepcopy only** in its first PR. `openapi-gen`
+  follows as the separate `codegen-openapi` todo (now merged) — it lands
+  before `apiserver-wiring` because `genericapiserver.RecommendedConfig`
+  consumes the generated `GetOpenAPIDefinitions`. `client-gen` is deferred
+  to no earlier than watch — its informers/listers depend on watch and
+  would otherwise emit code that 405s against our server.
+  The `+k8s:deepcopy-gen=package` and `+k8s:openapi-gen=true` markers live
+  in `pkg/apis/tasks/v1alpha1/doc.go` in **standalone** comment blocks
+  (not the package doc comment) — gengo only picks them up that way.
 - `genericregistry.Store` is **not** used — its etcd assumptions leak. We
   implement REST handlers against our own store directly.
 - **PR / merge convention:** A todo is only marked `done` once its PR has
@@ -90,7 +91,8 @@ this repo, paste the block below into the `sql` tool to populate it. Uses
 INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
   ('init-module',         'Initialize Go module + skeleton',         'go mod init github.com/eapolinario/simple-api-server, create empty package directories matching the planned layout, add hack/boilerplate.go.txt', 'pending'),
   ('types-v1alpha1',      'Define Task v1alpha1 types',              'pkg/apis/tasks/v1alpha1/types.go: Task, TaskSpec (image, command), TaskStatus (phase, conditions, observedGeneration), TaskList; register.go with GroupVersion + AddToScheme', 'pending'),
-  ('codegen-setup',       'Wire k8s code-generator',                 'hack/update-codegen.sh invoking kube_codegen.sh; flesh out Justfile codegen + verify-codegen recipes; generate deepcopy + openapi + client', 'pending'),
+  ('codegen-setup',       'Wire k8s code-generator (deepcopy)',      'hack/update-codegen.sh invoking kube_codegen.sh::gen_helpers; flesh out Justfile codegen + verify-codegen recipes; generate deepcopy', 'pending'),
+  ('codegen-openapi',     'Wire openapi-gen alongside deepcopy',     'extend hack/update-codegen.sh with kube_codegen.sh::gen_openapi; add openapi-gen to go.mod tool directive; add +k8s:openapi-gen=true marker to doc.go; commit hack/api-violations.report baseline', 'pending'),
   ('inmemory-store',      'Implement in-memory store',               'pkg/storage/inmemory: map keyed by namespaced name, sync.RWMutex, monotonic uint64 RV, generic over runtime.Object; unit tests for CRUD + RV monotonicity', 'pending'),
   ('strategy',            'Implement Task strategy + status strategy','pkg/registry/tasks/task/strategy.go: validation, mutability rules, observedGeneration discipline; table-driven unit tests', 'pending'),
   ('registry-storage',    'REST + StatusREST wiring',                'pkg/registry/tasks/task/storage.go: REST and StatusREST backed by in-memory store; typed errors via k8s.io/apimachinery/pkg/api/errors', 'pending'),
@@ -106,11 +108,13 @@ INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
 INSERT OR IGNORE INTO todo_deps (todo_id, depends_on) VALUES
   ('types-v1alpha1',      'init-module'),
   ('codegen-setup',       'types-v1alpha1'),
+  ('codegen-openapi',     'codegen-setup'),
   ('inmemory-store',      'init-module'),
   ('strategy',            'types-v1alpha1'),
   ('registry-storage',    'strategy'),
   ('registry-storage',    'inmemory-store'),
   ('apiserver-wiring',    'registry-storage'),
+  ('apiserver-wiring',    'codegen-openapi'),
   ('cmd-main',            'apiserver-wiring'),
   ('integration-harness', 'cmd-main'),
   ('integration-harness', 'codegen-setup'),
