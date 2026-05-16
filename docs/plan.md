@@ -106,7 +106,7 @@ INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
   ('registry-storage',    'REST + StatusREST wiring',                'pkg/registry/tasks/task/storage.go: REST and StatusREST backed by in-memory store; typed errors via k8s.io/apimachinery/pkg/api/errors', 'pending'),
   ('apiserver-wiring',    'GenericAPIServer config',                 'pkg/apiserver/apiserver.go: APIGroupInfo install, scheme registration, options', 'done'),
   ('cmd-main',            'Binary entrypoint',                       'cmd/simple-apiserver/main.go: option parsing, delegating auth in prod, server start', 'done'),
-  ('integration-harness', 'In-process integration tests',            'test/integration: boot server in-process, REST client round-trips for create/get/list/update/delete and status subresource', 'pending'),
+  ('integration-harness', 'In-process integration tests',            'test/integration: boot server in-process, REST client round-trips for create/get/list/update/delete and status subresource', 'done'),
   ('watch-405-test',      'Assert watch returns 405',                'test asserting ?watch=true returns MethodNotAllowed; lives in test/integration; documents the deferral', 'pending'),
   ('apiservice-manifest', 'APIService YAML',                         'manifests/apiservice.yaml registering v1alpha1.tasks.example.com', 'pending'),
   ('e2e-skeleton',        'Kind-based E2E',                          'test/e2e with //go:build e2e: apply APIService against kind, create Task through aggregator, assert reachable', 'pending'),
