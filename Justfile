@@ -51,7 +51,7 @@ e2e-down:
 # would otherwise be reused on a subsequent valid run).
 test-e2e:
     KUBECONFIG="$(pwd)/.local-run/kind-simple-apiserver-e2e.kubeconfig" \
-        go test -tags=e2e -count=1 ./test/e2e/...
+        go test -v -tags=e2e -count=1 ./test/e2e/...
 
 # Run the apiserver locally with strict auth (delegating-style). Useful
 # for inspecting flags / smoke-checking startup; kubectl will get 403
