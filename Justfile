@@ -44,9 +44,14 @@ e2e-down:
 # hack/e2e-up.sh writes, so the test never falls back to ~/.kube/config
 # and accidentally targets the wrong cluster. Requires `just e2e-up`
 # to have completed.
+#
+# -count=1 disables Go's test cache. E2E results depend on live cluster
+# state, which `go test`'s cache key can't see (KUBECONFIG isn't part
+# of the key, so a cached SKIP from a prior run with KUBECONFIG unset
+# would otherwise be reused on a subsequent valid run).
 test-e2e:
     KUBECONFIG="$(pwd)/.local-run/kind-simple-apiserver-e2e.kubeconfig" \
-        go test -tags=e2e ./test/e2e/...
+        go test -tags=e2e -count=1 ./test/e2e/...
 
 # Run the apiserver locally with strict auth (delegating-style). Useful
 # for inspecting flags / smoke-checking startup; kubectl will get 403
