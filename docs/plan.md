@@ -32,6 +32,22 @@ end-to-end slice first (Task with create/get/list/delete, no validation
 beyond required fields), then layer on status subresource, conditions,
 observedGeneration, and finally the deferred-watch test.
 
+### Phase 2 (post-skeleton)
+
+With the aggregated server live end-to-end (Phase 1 todos all merged),
+the remaining work clusters into three independent strands:
+
+1. **`watch`** — lift the 405 stub. This is the milestone the original
+   Notes section flagged as "not a real quick addition." Pick the
+   approach (cacher vs DIY) as a planning sub-task once the PR is
+   actually started; the todo only commits to working watch semantics
+   plus deleting `test/integration/watch_test.go` in the same PR.
+2. **`client-gen`** — unblocked only after `watch`, per the existing
+   Notes rationale (informers would otherwise 405 against us).
+3. **`validation`** — expand Task validation beyond "image required."
+   Independent of the other two; scope intentionally bounded (see the
+   Notes entry).
+
 ## Todos
 
 | id | title | depends on |
@@ -52,6 +68,9 @@ observedGeneration, and finally the deferred-watch test.
 | `e2e-tls` | Real serving certs + caBundle for e2e | `e2e-skeleton` |
 | `makefile` | Justfile surface | `init-module` |
 | `ci` | GitHub Actions CI | `makefile` |
+| `watch` | Implement watch (lift the 405 stub) | `registry-storage`, `integration-harness` |
+| `client-gen` | Wire client-gen + informers/listers | `watch`, `codegen-setup` |
+| `validation` | Expand Task validation beyond "image required" | `strategy` |
 
 Descriptions for each todo are in the seed block below — keep them in sync
 with this table when editing.
@@ -88,6 +107,20 @@ with this table when editing.
   `IsResourceRequest()` is true). The `just dev` / `just dev-kubeconfig` /
   `just dev-clean` recipes are the supported way to drive the binary
   locally with kubectl.
+- **`watch` exit criteria:** a controller using `SharedInformerFactory`
+  against our server can `List + Watch` Tasks and observe Add / Update /
+  Delete events without falling back to relist. The 405 regression test
+  in `test/integration/watch_test.go` is **deleted in the same PR** so
+  no one accidentally re-asserts the deferral. Approach (cacher wrapper
+  vs DIY RV + replay) is a sub-decision recorded in the PR description,
+  not pre-committed here.
+- **`validation` scope:** bounded to (a) required/length constraints on
+  `spec.image` and `spec.command`, (b) an enum constraint on
+  `status.phase`, (c) one immutability rule on `spec.image` once
+  `status.phase` leaves Pending. Anything beyond — CEL, webhooks,
+  cross-field constraints — is a separate follow-up todo, not scope
+  creep on this one. Lives in `pkg/registry/tasks/task/strategy.go`
+  + a new `validation.go` sibling; no new dependencies.
 
 ## SQL seed block (rehydrate in-session todos)
 
@@ -113,7 +146,10 @@ INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
   ('e2e-skeleton',        'Kind-based E2E',                          'test/e2e with //go:build e2e: Dockerfile, manifests/e2e/ (ns+rbac+deployment+service), hack/e2e-up.sh + hack/e2e-down.sh, aggregator round-trip test against kind', 'done'),
   ('e2e-tls',             'Real serving certs + caBundle for e2e',   'hack/gen-certs Go tool generates CA + serving cert into .local-run/e2e-certs/; hack/e2e-up.sh creates a kubernetes.io/tls Secret, mounts it into the deployment via --tls-cert-file/--tls-private-key-file, and renders manifests/apiservice.yaml (now a template) with the base64 CA into APIService.spec.caBundle. insecureSkipTLSVerify removed.', 'done'),
   ('makefile',            'Justfile surface',                        'build, test, test-unit, test-integration, test-e2e, codegen, verify-codegen, lint, fmt, clean recipes (the `makefile` id is retained for stability — the file itself is a Justfile)', 'done'),
-  ('ci',                  'GitHub Actions CI',                       'workflow running unit + integration + verify-codegen on PRs', 'done');
+  ('ci',                  'GitHub Actions CI',                       'workflow running unit + integration + verify-codegen on PRs', 'done'),
+  ('watch',               'Implement watch (lift the 405 stub)',     'replace the 405 stub with real watch semantics (cacher wrapper vs DIY RV + replay decided in the PR); delete test/integration/watch_test.go in the same commit; integration test asserting Reflector observes Add/Update/Delete without relisting', 'pending'),
+  ('client-gen',          'Wire client-gen + informers/listers',     'extend hack/update-codegen.sh with kube_codegen.sh::gen_client; emit typed clientset + informers + listers under pkg/generated/; integration test that a SharedInformerFactory against our server delivers events', 'pending'),
+  ('validation',          'Expand Task validation',                  'pkg/registry/tasks/task/validation.go: length/required constraints on spec.image and spec.command, enum on status.phase, immutability of spec.image once status.phase leaves Pending; table-driven unit + integration tests', 'pending');
 
 INSERT OR IGNORE INTO todo_deps (todo_id, depends_on) VALUES
   ('types-v1alpha1',      'init-module'),
@@ -134,7 +170,12 @@ INSERT OR IGNORE INTO todo_deps (todo_id, depends_on) VALUES
   ('e2e-skeleton',        'integration-harness'),
   ('e2e-tls',             'e2e-skeleton'),
   ('makefile',            'init-module'),
-  ('ci',                  'makefile');
+  ('ci',                  'makefile'),
+  ('watch',               'registry-storage'),
+  ('watch',               'integration-harness'),
+  ('client-gen',          'watch'),
+  ('client-gen',          'codegen-setup'),
+  ('validation',          'strategy');
 ```
 
 ### Querying ready work
