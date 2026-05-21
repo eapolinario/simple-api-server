@@ -97,21 +97,21 @@ this repo, paste the block below into the `sql` tool to populate it. Uses
 
 ```sql
 INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
-  ('init-module',         'Initialize Go module + skeleton',         'go mod init github.com/eapolinario/simple-api-server, create empty package directories matching the planned layout, add hack/boilerplate.go.txt', 'pending'),
-  ('types-v1alpha1',      'Define Task v1alpha1 types',              'pkg/apis/tasks/v1alpha1/types.go: Task, TaskSpec (image, command), TaskStatus (phase, conditions, observedGeneration), TaskList; register.go with GroupVersion + AddToScheme', 'pending'),
-  ('codegen-setup',       'Wire k8s code-generator (deepcopy)',      'hack/update-codegen.sh invoking kube_codegen.sh::gen_helpers; flesh out Justfile codegen + verify-codegen recipes; generate deepcopy', 'pending'),
-  ('codegen-openapi',     'Wire openapi-gen alongside deepcopy',     'extend hack/update-codegen.sh with kube_codegen.sh::gen_openapi; add openapi-gen to go.mod tool directive; add +k8s:openapi-gen=true marker to doc.go; commit hack/api-violations.report baseline', 'pending'),
-  ('inmemory-store',      'Implement in-memory store',               'pkg/storage/inmemory: map keyed by namespaced name, sync.RWMutex, monotonic uint64 RV, generic over runtime.Object; unit tests for CRUD + RV monotonicity', 'pending'),
-  ('strategy',            'Implement Task strategy + status strategy','pkg/registry/tasks/task/strategy.go: validation, mutability rules, observedGeneration discipline; table-driven unit tests', 'pending'),
-  ('registry-storage',    'REST + StatusREST wiring',                'pkg/registry/tasks/task/storage.go: REST and StatusREST backed by in-memory store; typed errors via k8s.io/apimachinery/pkg/api/errors', 'pending'),
+  ('init-module',         'Initialize Go module + skeleton',         'go mod init github.com/eapolinario/simple-api-server, create empty package directories matching the planned layout, add hack/boilerplate.go.txt', 'done'),
+  ('types-v1alpha1',      'Define Task v1alpha1 types',              'pkg/apis/tasks/v1alpha1/types.go: Task, TaskSpec (image, command), TaskStatus (phase, conditions, observedGeneration), TaskList; register.go with GroupVersion + AddToScheme', 'done'),
+  ('codegen-setup',       'Wire k8s code-generator (deepcopy)',      'hack/update-codegen.sh invoking kube_codegen.sh::gen_helpers; flesh out Justfile codegen + verify-codegen recipes; generate deepcopy', 'done'),
+  ('codegen-openapi',     'Wire openapi-gen alongside deepcopy',     'extend hack/update-codegen.sh with kube_codegen.sh::gen_openapi; add openapi-gen to go.mod tool directive; add +k8s:openapi-gen=true marker to doc.go; commit hack/api-violations.report baseline', 'done'),
+  ('inmemory-store',      'Implement in-memory store',               'pkg/storage/inmemory: map keyed by namespaced name, sync.RWMutex, monotonic uint64 RV, generic over runtime.Object; unit tests for CRUD + RV monotonicity', 'done'),
+  ('strategy',            'Implement Task strategy + status strategy','pkg/registry/tasks/task/strategy.go: validation, mutability rules, observedGeneration discipline; table-driven unit tests', 'done'),
+  ('registry-storage',    'REST + StatusREST wiring',                'pkg/registry/tasks/task/storage.go: REST and StatusREST backed by in-memory store; typed errors via k8s.io/apimachinery/pkg/api/errors', 'done'),
   ('apiserver-wiring',    'GenericAPIServer config',                 'pkg/apiserver/apiserver.go: APIGroupInfo install, scheme registration, options', 'done'),
   ('cmd-main',            'Binary entrypoint',                       'cmd/simple-apiserver/main.go: option parsing, delegating auth in prod, server start', 'done'),
   ('integration-harness', 'In-process integration tests',            'test/integration: boot server in-process, REST client round-trips for create/get/list/update/delete and status subresource', 'done'),
   ('watch-405-test',      'Assert watch returns 405',                'test asserting ?watch=true returns MethodNotAllowed; lives in test/integration; documents the deferral', 'pending'),
-  ('apiservice-manifest', 'APIService YAML',                         'manifests/apiservice.yaml registering v1alpha1.tasks.example.com', 'pending'),
+  ('apiservice-manifest', 'APIService YAML',                         'manifests/apiservice.yaml registering v1alpha1.tasks.example.com', 'done'),
   ('e2e-skeleton',        'Kind-based E2E',                          'test/e2e with //go:build e2e: apply APIService against kind, create Task through aggregator, assert reachable', 'pending'),
-  ('makefile',            'Justfile surface',                        'build, test, test-unit, test-integration, test-e2e, codegen, verify-codegen, lint, fmt, clean recipes (the `makefile` id is retained for stability — the file itself is a Justfile)', 'pending'),
-  ('ci',                  'GitHub Actions CI',                       'workflow running unit + integration + verify-codegen on PRs', 'pending');
+  ('makefile',            'Justfile surface',                        'build, test, test-unit, test-integration, test-e2e, codegen, verify-codegen, lint, fmt, clean recipes (the `makefile` id is retained for stability — the file itself is a Justfile)', 'done'),
+  ('ci',                  'GitHub Actions CI',                       'workflow running unit + integration + verify-codegen on PRs', 'done');
 
 INSERT OR IGNORE INTO todo_deps (todo_id, depends_on) VALUES
   ('types-v1alpha1',      'init-module'),
