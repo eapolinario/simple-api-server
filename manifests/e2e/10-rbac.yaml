@@ -1,0 +1,50 @@
+# ServiceAccount + RBAC for the aggregated apiserver running in-cluster.
+#
+# The server uses delegating authn/authz (the cmd-main default), which
+# means it has to call the front-proxy kube-apiserver to:
+#   * resolve client certs / tokens (TokenReview)
+#   * authorize requests (SubjectAccessReview)
+#   * read the extension-apiserver-authentication configmap to learn the
+#     front-proxy CA + allowed names (this is what makes aggregator
+#     requests trusted)
+#
+# Two bindings make that work, both standard for aggregated apiservers:
+#   1. ClusterRoleBinding to system:auth-delegator
+#      → grants create on tokenreviews + subjectaccessreviews
+#   2. RoleBinding in kube-system to
+#      extension-apiserver-authentication-reader
+#      → grants get on the configmap of the same name
+#
+# Anything beyond these two is over-privileging.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: simple-apiserver
+  namespace: simple-apiserver
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: simple-apiserver:auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: simple-apiserver
+    namespace: simple-apiserver
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: simple-apiserver:extension-apiserver-authentication-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: simple-apiserver
+    namespace: simple-apiserver

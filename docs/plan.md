@@ -49,6 +49,7 @@ observedGeneration, and finally the deferred-watch test.
 | `watch-405-test` | Assert watch returns 405 | `integration-harness` |
 | `apiservice-manifest` | APIService YAML | `apiserver-wiring` |
 | `e2e-skeleton` | Kind-based E2E | `apiservice-manifest`, `integration-harness` |
+| `e2e-tls` | Real serving certs + caBundle for e2e | `e2e-skeleton` |
 | `makefile` | Justfile surface | `init-module` |
 | `ci` | GitHub Actions CI | `makefile` |
 
@@ -109,7 +110,8 @@ INSERT OR IGNORE INTO todos (id, title, description, status) VALUES
   ('integration-harness', 'In-process integration tests',            'test/integration: boot server in-process, REST client round-trips for create/get/list/update/delete and status subresource', 'done'),
   ('watch-405-test',      'Assert watch returns 405',                'test asserting ?watch=true returns MethodNotAllowed; lives in test/integration; documents the deferral', 'pending'),
   ('apiservice-manifest', 'APIService YAML',                         'manifests/apiservice.yaml registering v1alpha1.tasks.example.com', 'done'),
-  ('e2e-skeleton',        'Kind-based E2E',                          'test/e2e with //go:build e2e: apply APIService against kind, create Task through aggregator, assert reachable', 'pending'),
+  ('e2e-skeleton',        'Kind-based E2E',                          'test/e2e with //go:build e2e: Dockerfile, manifests/e2e/ (ns+rbac+deployment+service), hack/e2e-up.sh + hack/e2e-down.sh, aggregator round-trip test against kind', 'pending'),
+  ('e2e-tls',             'Real serving certs + caBundle for e2e',   'replace insecureSkipTLSVerify with a generated CA-signed serving cert mounted into the deployment and propagated to APIService.spec.caBundle; deferred from e2e-skeleton', 'pending'),
   ('makefile',            'Justfile surface',                        'build, test, test-unit, test-integration, test-e2e, codegen, verify-codegen, lint, fmt, clean recipes (the `makefile` id is retained for stability — the file itself is a Justfile)', 'done'),
   ('ci',                  'GitHub Actions CI',                       'workflow running unit + integration + verify-codegen on PRs', 'done');
 
@@ -130,6 +132,7 @@ INSERT OR IGNORE INTO todo_deps (todo_id, depends_on) VALUES
   ('apiservice-manifest', 'apiserver-wiring'),
   ('e2e-skeleton',        'apiservice-manifest'),
   ('e2e-skeleton',        'integration-harness'),
+  ('e2e-tls',             'e2e-skeleton'),
   ('makefile',            'init-module'),
   ('ci',                  'makefile');
 ```
