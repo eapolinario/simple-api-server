@@ -1,6 +1,7 @@
 # Binaries (root-anchored so they don't shadow cmd/simple-apiserver/)
 /simple-api-server
 /simple-apiserver
+/gen-certs
 *.exe
 *.exe~
 *.dll

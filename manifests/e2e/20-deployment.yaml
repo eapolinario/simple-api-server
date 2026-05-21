@@ -5,13 +5,14 @@
 # IfNotPresent so kind uses the loaded image without trying to pull from
 # a registry.
 #
-# Serving cert: we let the server auto-generate a self-signed serving
-# cert into /var/run/simple-apiserver/certs on startup (the
-# k8s.io/apiserver SecureServingOptions does this when --cert-dir is set
-# and no cert exists). The APIService has insecureSkipTLSVerify: true
-# specifically so this works without cert-manager / CA wiring. This is
-# the deliberate skeleton shortcut documented in apiservice.yaml and
-# tracked under the e2e-tls follow-up todo.
+# Serving cert: mounted read-only from the `simple-apiserver-tls`
+# Secret created by hack/e2e-up.sh. The Secret is of type kubernetes.io/tls,
+# so it exposes tls.crt and tls.key at the mount path. The apiserver's
+# --tls-cert-file / --tls-private-key-file flags point at those files
+# directly; --cert-dir is unused in this mode (no auto-generation).
+# APIService.spec.caBundle is populated with the matching CA so the
+# aggregator can verify the chain end-to-end — no insecureSkipTLSVerify
+# anywhere.
 #
 # Auth flags: nothing extra here. cmd-main defaults to delegating
 # authn/authz when --authorization-mode is empty, which is exactly what
@@ -40,18 +41,19 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --secure-port=6443
-            - --cert-dir=/var/run/simple-apiserver/certs
+            - --tls-cert-file=/var/run/simple-apiserver/certs/tls.crt
+            - --tls-private-key-file=/var/run/simple-apiserver/certs/tls.key
           ports:
             - name: https
               containerPort: 6443
               protocol: TCP
-          # distroless/static:nonroot runs as uid 65532. /var/run is
-          # writable on tmpfs in pods by default, but the subdir is not
-          # — mount an emptyDir so the auto-generated cert has somewhere
-          # to land without needing root.
+          # Read-only mount of the kubernetes.io/tls Secret that holds
+          # the CA-signed serving cert. The Secret is created by
+          # hack/e2e-up.sh from .local-run/e2e-certs/.
           volumeMounts:
-            - name: cert-dir
+            - name: serving-cert
               mountPath: /var/run/simple-apiserver/certs
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /readyz
@@ -67,8 +69,9 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
       volumes:
-        - name: cert-dir
-          emptyDir: {}
+        - name: serving-cert
+          secret:
+            secretName: simple-apiserver-tls
 ---
 # Service that the aggregator points at. Port 443 → container 6443 keeps
 # the APIService spec.service.port: 443 (kube-apiserver's default
