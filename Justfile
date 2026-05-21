@@ -40,10 +40,13 @@ e2e-up:
 e2e-down:
     hack/e2e-down.sh
 
-# Run kind-based E2E tests (slow; requires `just e2e-up` to have
-# completed and KUBECONFIG to point at the resulting cluster).
+# Run kind-based E2E tests. Sets KUBECONFIG explicitly to the file
+# hack/e2e-up.sh writes, so the test never falls back to ~/.kube/config
+# and accidentally targets the wrong cluster. Requires `just e2e-up`
+# to have completed.
 test-e2e:
-    go test -tags=e2e ./test/e2e/...
+    KUBECONFIG="$(pwd)/.local-run/kind-simple-apiserver-e2e.kubeconfig" \
+        go test -tags=e2e ./test/e2e/...
 
 # Run the apiserver locally with strict auth (delegating-style). Useful
 # for inspecting flags / smoke-checking startup; kubectl will get 403
