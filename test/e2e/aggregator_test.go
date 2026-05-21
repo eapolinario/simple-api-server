@@ -7,8 +7,23 @@ Copyright 2026 Eduardo Apolinario.
 // Package e2e exercises the aggregated apiserver through the
 // kube-aggregator in a real (kind) cluster. The cluster is provisioned
 // by hack/e2e-up.sh — these tests do not stand up infrastructure
-// themselves; they just assume KUBECONFIG points at a cluster where the
-// v1alpha1.tasks.example.com APIService is registered and Available.
+// themselves.
+//
+// Target selection is intentionally strict to avoid the footgun where
+// a stale ~/.kube/config silently routes the test at the wrong
+// cluster:
+//
+//  1. KUBECONFIG must be explicitly set. We never fall back to
+//     ~/.kube/config. `just test-e2e` sets it to the file
+//     hack/e2e-up.sh writes; running `go test -tags=e2e ./test/e2e/...`
+//     from a bare shell will SKIP, not silently re-use whatever
+//     cluster happens to be in scope.
+//
+//  2. Once KUBECONFIG is set, the test PRE-FLIGHTS that the
+//     v1alpha1.tasks.example.com APIService exists and has
+//     condition Available=True. A missing or unavailable APIService
+//     is a hard FAIL — not a skip — because by then the dev has
+//     explicitly opted in.
 //
 // Gated by the `e2e` build tag so the default `just test` loop never
 // pays for them. Run with `just test-e2e` after `just e2e-up`.
@@ -16,7 +31,9 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	v1alpha1 "github.com/eapolinario/simple-api-server/pkg/apis/tasks/v1alpha1"
@@ -39,20 +57,50 @@ var tasksGVR = schema.GroupVersionResource{
 	Resource: "tasks",
 }
 
-// e2eClient resolves a dynamic client against the cluster pointed at by
-// KUBECONFIG (falling back to the standard kubeconfig loading rules:
-// $KUBECONFIG, then ~/.kube/config). Tests that can't reach a cluster
-// are skipped, not failed — the kind cluster is provisioned by
-// hack/e2e-up.sh and may legitimately be absent on a dev box.
+// apiServicesGVR identifies the kube-aggregator's own APIService
+// resource — the test uses it to preflight that our group is actually
+// registered and Available on whichever cluster KUBECONFIG points at.
+var apiServicesGVR = schema.GroupVersionResource{
+	Group:    "apiregistration.k8s.io",
+	Version:  "v1",
+	Resource: "apiservices",
+}
+
+const apiServiceName = "v1alpha1.tasks.example.com"
+
+// preflightOnce guards the per-cluster APIService preflight so a test
+// run with N test functions hits the kube-apiserver once, not N times.
+var (
+	preflightOnce sync.Once
+	preflightErr  error
+)
+
+// e2eClient resolves a dynamic client against the cluster pointed at
+// by $KUBECONFIG (no fallback to ~/.kube/config — see package doc) and
+// runs the APIService preflight on first call.
+//
+// Returns a namespace-scoped client for tasks/default plus a context
+// with a 30s deadline.
 func e2eClient(t *testing.T) (context.Context, dynamic.ResourceInterface) {
 	t.Helper()
 
-	loader := clientcmd.NewDefaultClientConfigLoadingRules()
-	cfg, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		loader, &clientcmd.ConfigOverrides{},
-	).ClientConfig()
+	kc := os.Getenv("KUBECONFIG")
+	if kc == "" {
+		t.Skip("KUBECONFIG not set; use `just test-e2e` (which sets it) after `just e2e-up`. " +
+			"Refusing to fall back to ~/.kube/config — that footgun was the whole point of this fix.")
+	}
+	if _, err := os.Stat(kc); err != nil {
+		t.Skipf("KUBECONFIG=%s does not exist (run `just e2e-up` first): %v", kc, err)
+	}
+
+	cfg, err := clientcmd.BuildConfigFromFlags("", kc)
 	if err != nil {
-		t.Skipf("no usable kubeconfig (run hack/e2e-up.sh first): %v", err)
+		t.Fatalf("load kubeconfig %s: %v", kc, err)
+	}
+
+	preflightOnce.Do(func() { preflightErr = preflightAPIService(cfg) })
+	if preflightErr != nil {
+		t.Fatalf("e2e preflight against KUBECONFIG=%s: %v", kc, preflightErr)
 	}
 
 	dc, err := dynamic.NewForConfig(cfg)
@@ -64,6 +112,59 @@ func e2eClient(t *testing.T) (context.Context, dynamic.ResourceInterface) {
 	t.Cleanup(cancel)
 
 	return ctx, dc.Resource(tasksGVR).Namespace("default")
+}
+
+// preflightAPIService asserts that the cluster pointed at by cfg has
+// our APIService registered AND that the aggregator considers it
+// Available. This is what makes the "wrong cluster" failure mode loud:
+// even if some other cluster happens to answer the dynamic client, it
+// won't have THIS APIService.
+func preflightAPIService(cfg *rest.Config) error {
+	dc, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("build dynamic client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	obj, err := dc.Resource(apiServicesGVR).Get(ctx, apiServiceName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("APIService %s is not registered on this cluster — "+
+				"either KUBECONFIG points at the wrong cluster, or `just e2e-up` "+
+				"hasn't been run", apiServiceName)
+		}
+		return fmt.Errorf("get APIService %s: %w", apiServiceName, err)
+	}
+
+	conds, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
+	if err != nil {
+		return fmt.Errorf("APIService %s: read status.conditions: %w", apiServiceName, err)
+	}
+	if !found {
+		return fmt.Errorf("APIService %s has no status.conditions yet — aggregator hasn't probed it", apiServiceName)
+	}
+
+	for _, raw := range conds {
+		c, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		ctype, _ := c["type"].(string)
+		if ctype != "Available" {
+			continue
+		}
+		status, _ := c["status"].(string)
+		if status == "True" {
+			return nil
+		}
+		reason, _ := c["reason"].(string)
+		msg, _ := c["message"].(string)
+		return fmt.Errorf("APIService %s Available=%s reason=%s message=%s",
+			apiServiceName, status, reason, msg)
+	}
+	return fmt.Errorf("APIService %s has no Available condition (aggregator hasn't probed it)", apiServiceName)
 }
 
 // newTask is the e2e mirror of the integration helper of the same
@@ -146,8 +247,9 @@ func TestAggregatorRoundTrip(t *testing.T) {
 // without re-running with extra verbosity. Cheap and worth the noise.
 func TestMain(m *testing.M) {
 	if kc := os.Getenv("KUBECONFIG"); kc != "" {
-		// Stderr so it shows up next to test output regardless of -v.
 		_, _ = os.Stderr.WriteString("e2e: KUBECONFIG=" + kc + "\n")
+	} else {
+		_, _ = os.Stderr.WriteString("e2e: KUBECONFIG not set; all tests will SKIP. Run `just e2e-up && just test-e2e`.\n")
 	}
 	os.Exit(m.Run())
 }
