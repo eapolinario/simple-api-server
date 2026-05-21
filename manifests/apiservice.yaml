@@ -1,0 +1,34 @@
+# APIService registration for the aggregated simple-apiserver.
+#
+# Registers tasks.example.com/v1alpha1 with the kube-aggregator so that
+# requests to /apis/tasks.example.com/v1alpha1/... on the front-proxy
+# kube-apiserver are forwarded to this server.
+#
+# The companion Service + Deployment are intentionally NOT in this file —
+# the local-dev story is `just dev` (loopback, AlwaysAllow) and the cluster
+# story is e2e (kind), which will wrap this manifest with whatever Service
+# topology it needs. Keeping the APIService standalone makes it reusable.
+#
+# Two knobs the e2e harness is expected to patch:
+#   * spec.service.{name,namespace,port} — point at wherever the server runs
+#   * spec.caBundle — base64 PEM of the CA that signed the serving cert
+#     (when insecureSkipTLSVerify is removed)
+#
+# `insecureSkipTLSVerify: true` is set deliberately for the bootstrap E2E.
+# It MUST be removed (and caBundle populated) before this is used anywhere
+# resembling production. See docs/plan.md.
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1alpha1.tasks.example.com
+spec:
+  group: tasks.example.com
+  version: v1alpha1
+  groupPriorityMinimum: 1000
+  versionPriority: 15
+  service:
+    name: simple-apiserver
+    namespace: simple-apiserver
+    port: 443
+  # Bootstrap only — replace with caBundle before any non-toy use.
+  insecureSkipTLSVerify: true
