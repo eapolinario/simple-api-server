@@ -21,6 +21,10 @@
               pkgs.just
               pkgs.kubectl
               pkgs.kind
+              # docker CLI only — the daemon is a host concern
+              # (system service on Linux, Docker Desktop on macOS).
+              # kind + the e2e image-build path both shell out to `docker`.
+              pkgs.docker-client
             ];
           };
         });
