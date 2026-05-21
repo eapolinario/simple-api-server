@@ -1,0 +1,14 @@
+# Namespace that hosts the aggregated apiserver inside the e2e kind
+# cluster. Matches spec.service.namespace in manifests/apiservice.yaml.
+#
+# Everything e2e-related lives in this namespace so `kubectl delete
+# namespace simple-apiserver` is a sufficient teardown for the in-cluster
+# objects (the APIService itself is cluster-scoped and gets torn down
+# separately by hack/e2e-down.sh).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: simple-apiserver
+  labels:
+    app.kubernetes.io/name: simple-apiserver
+    app.kubernetes.io/component: aggregated-apiserver

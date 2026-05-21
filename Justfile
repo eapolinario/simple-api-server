@@ -30,7 +30,18 @@ test-unit:
 test-integration:
     go test ./test/integration/...
 
-# Run kind-based E2E tests (slow; requires a kind cluster)
+# Bring up the kind-based e2e environment: kind cluster, build + load
+# the apiserver image, apply manifests, wait for the APIService to be
+# Available. Idempotent. Requires a docker daemon on the host.
+e2e-up:
+    hack/e2e-up.sh
+
+# Tear down the kind-based e2e environment.
+e2e-down:
+    hack/e2e-down.sh
+
+# Run kind-based E2E tests (slow; requires `just e2e-up` to have
+# completed and KUBECONFIG to point at the resulting cluster).
 test-e2e:
     go test -tags=e2e ./test/e2e/...
 
